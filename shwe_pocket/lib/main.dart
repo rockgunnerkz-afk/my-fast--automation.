@@ -15,7 +15,7 @@ class ShwePocketClientApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
-      theme: ThemeData.dark(),
+      theme: ThemeData.dark(), // Pro ကျကျ Dark Mode ဗိသုကာ
       home: const MainNodeScreen(),
     );
   }
@@ -29,9 +29,10 @@ class MainNodeScreen extends StatefulWidget {
 }
 
 class _MainNodeScreenState extends State<MainNodeScreen> {
-  // ⚙️ CONFIGURATION (Termux Port Forward သုံးထား၍ Localhost အတိုင်း ထားပါသည်)
-  final String serverUrl = "ws://127.0.0.1:8000"; 
-  final String phoneNumber = "09777777777"; 
+  // ⚙️ SERVER & USER CONFIGURATION
+  // 💡 Termux သို့မဟုတ် Codespace ဆာဗာ၏ IP Address ကို ဤနေရာတွင် ပြင်ဆင်ရန်
+  final String serverUrl = "wss://redesigned-lamp-pj4vrr6r9wpv364q9-8000.app.github.dev"; 
+  final String phoneNumber = "09777777777"; // စမ်းသပ်ရန် User ဖုန်းနံပါတ်
 
   IOWebSocketChannel? _channel;
   bool _isMining = false;
@@ -39,20 +40,21 @@ class _MainNodeScreenState extends State<MainNodeScreen> {
   double _mbShared = 0.0;
   Timer? _depinTimer;
 
-  // 🛡️ Get Unique Device ID
+  // 🛡️ Get Device ID (စက်တစ်လုံးတည်း အကောင့်ခွဲတူးခြင်း ကာကွယ်ရန် Unique ID ဖတ်စနစ်)
   Future<String> _getDeviceId() async {
     DeviceInfoPlugin deviceInfo = DeviceInfoPlugin();
     try {
       AndroidDeviceInfo androidInfo = await deviceInfo.androidInfo;
       return androidInfo.id; 
     } catch (e) {
-      return "DESKTOP_TEST_NODE_ID";
+      return "DESKTOP_TEST_NODE_ID"; // Emulator သို့မဟုတ် Desktop ဖြင့် စမ်းသပ်ပါက သုံးရန်
     }
   }
 
-  // 🚀 Start Shwe Pocket Node
+  // 🚀 Start Shwe Pocket Node Connector
   void _startNode() async {
     String deviceId = await _getDeviceId();
+    // ဆာဗာ၏ WebSocket Endpoint သို့ Route လမ်းကြောင်း ချိတ်ဆက်ခြင်း
     final connectionUrl = "$serverUrl/$deviceId/$phoneNumber";
 
     try {
@@ -63,9 +65,11 @@ class _MainNodeScreenState extends State<MainNodeScreen> {
         _statusMessage = "Shwe Pocket Network နှင့် ချိတ်ဆက်မှု အောင်မြင်သည် 📡";
       });
 
+      // 🎧 ဆာဗာဆီမှ Real-time ဝင်လာမည့် Commands များကို နားထောင်မည့် Loop
       _channel!.stream.listen((message) {
         final data = jsonDecode(message);
         
+        // ကွန်ရက်မှ AI အလုပ်လှမ်းထိုး (Task Injection) လာပါက လက်ခံတွက်ချက်မည်
         if (data["type"] == "ai_wasm_task") {
           _executeWasmTask(data["task_id"], data["script_text"]);
         } else if (data["type"] == "error" && data["msg"] == "device_conflict") {
@@ -76,10 +80,10 @@ class _MainNodeScreenState extends State<MainNodeScreen> {
         }
       }, onDone: () => _stopNode(), onError: (err) => _stopNode());
 
-      // 📡 DePIN Data Pool Timed Worker (10s interval)
+      // 📡 Simulated DePIN Data Pool Worker (၁၀ စက္ကန့်တစ်ကြိမ် Data စုကန်ထဲ လှမ်းပို့မည့် Worker)
       _depinTimer = Timer.periodic(const Duration(seconds: 10), (timer) {
         if (_channel != null) {
-          _mbShared += 0.2;
+          _mbShared += 0.2; // ဒေတာ ပမာဏ တက်လာပုံပြရန်
           _channel!.sink.add(jsonEncode({
             "type": "depin_data",
             "mb_shared": 0.2
@@ -96,15 +100,19 @@ class _MainNodeScreenState extends State<MainNodeScreen> {
     }
   }
 
-  // ⚡ CPU WASM WORKER TASK
+  // ⚡ CPU REAL-TIME WORKER ENGINE
   void _executeWasmTask(int taskId, String scriptText) async {
     setState(() {
       _statusMessage = "⚡ AI Task $taskId ကို ဖုန်း CPU သုံး၍ တွက်ချက်နေပါသည်...";
     });
 
-    print("🧠 Processing: $scriptText");
-    await Future.delayed(const Duration(seconds: 3)); 
+    print("🧠 Processing Text-To-Speech: $scriptText");
+    
+    // 💡 ဤနေရာတွင် တကယ့် App ၌ ပေါ့ပါးသော Micro Wasm Runtime က ဖုန်း CPU ကို သုံး၍ 
+    // မြန်မာစာသားကို သဘာဝကျသော အသံဖိုင်အဖြစ် အနောက်ကွယ်မှ ပြောင်းလဲပေးမည်ဖြစ်သည်။
+    await Future.delayed(const Duration(seconds: 3)); // တွက်ချက်မှု ကြာချိန် ၃ စက္ကန့် အတုပြုလုပ်ခြင်း
 
+    // တွက်ချက်ပြီးမြောက်ပါက ဆာဗာဆီသို့ အသံဒေတာ ပြန်ပို့ခြင်း
     if (_channel != null) {
       _channel!.sink.add(jsonEncode({
         "type": "wasm_task_complete",
@@ -146,6 +154,7 @@ class _MainNodeScreenState extends State<MainNodeScreen> {
           mainAxisAlignment: MainAxisAlignment.center,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
+            // Status UI Display Card
             Container(
               padding: const EdgeInsets.all(20),
               decoration: BoxDecoration(
@@ -169,6 +178,7 @@ class _MainNodeScreenState extends State<MainNodeScreen> {
               ),
             ),
             const SizedBox(height: 40),
+            // Statistics Tiles
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceAround,
               children: [
@@ -177,6 +187,7 @@ class _MainNodeScreenState extends State<MainNodeScreen> {
               ],
             ),
             const SizedBox(height: 50),
+            // Action Button
             ElevatedButton(
               onPressed: _isMining ? _stopNode : _startNode,
               style: ElevatedButton.styleFrom(
